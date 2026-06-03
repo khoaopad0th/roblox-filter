@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice Responsive Image & Video Generator</title>
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --primary-hover: #4338ca;
+            --bg: #0f172a;
+            --card-bg: #1e293b;
+            --text: #f8fafc;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 900px;
+            width: 100%;
+            background: var(--card-bg);
+            padding: 30px;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #60a5fa;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        @media (max-width: 768px) {
+            .grid { grid-template-columns: 1fr; }
+        }
+
+        .panel {
+            background: rgba(255,255,255,0.05);
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .panel h3 {
+            margin-top: 0;
+            border-bottom: 2px solid rgba(255,255,255,0.1);
+            padding-bottom: 8px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        input[type="file"], select {
+            width: 100%;
+            padding: 10px;
+            background: #0f172a;
+            border: 1px solid #334155;
+            color: #fff;
+            border-radius: 6px;
+            box-sizing: border-box;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 12px;
+            background: #334155;
+            border: none;
+            color: #fff;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .tab-btn.active {
+            background: var(--primary);
+            box-shadow: 0 4px 12px rgba(79, 70, 229, 0.4);
+        }
+
+        /* Stage Canvas Area */
+        .stage-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-top: 20px;
+        }
+
+        /* ซ่อน Canvas จริงไว้ แต่ตั้งขนาดเป็น 1080p เพื่อใช้อัดวิดีโอ */
+        canvas {
+            background: #00ff00; /* Green Screen เผื่อนำไปคีย์ออกได้ */
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+        }
+
+        .controls {
+            margin-top: 20px;
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            width: 100%;
+        }
+
+        .btn {
+            padding: 12px 30px;
+            font-size: 16px;
+            font-weight: bold;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-start { background: #10b981; color: white; }
+        .btn-start:hover { background: #059669; }
+        .btn-stop { background: #ef4444; color: white; }
+        .btn-stop:hover { background: #dc2626; }
+        .btn:disabled { background: #475569; cursor: not-allowed; opacity: 0.6; }
+
+        .status {
+            text-align: center;
+            font-weight: bold;
+            color: #f59e0b;
+            margin-top: 10px;
+            min-height: 24px;
+        }
+
+        #videoPreviewContainer {
+            margin-top: 20px;
+            text-align: center;
+            width: 100%;
+        }
+        
+        video {
+            max-width: 100%;
+            border-radius: 8px;
+            border: 2px solid #475569;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Voice Responsive Avatar & Video Generator</h1>
+
+    <div class="grid">
+        <div class="panel">
+            <h3>1. อัพโหลดรูปภาพ Avatar</h3>
+            <div class="form-group">
+                <label for="img1Input">ภาพที่ 1: ตอนเงียบ (ไม่พูด)</label>
+                <input type="file" id="img1Input" accept="image/*">
+            </div>
+            <div class="form-group">
+                <label for="img2Input">ภาพที่ 2: ตอนพูด (เด้งขึ้น)</label>
+                <input type="file" id="img2Input" accept="image/*">
+            </div>
+            <div class="form-group">
+                <label for="thresholdSelect">ระดับความไวเสียง (Sensitivity)</label>
+                <select id="thresholdSelect">
+                    <option value="20">ไวมาก (เสียงเบาก็เด้ง)</option>
+                    <option value="40" selected>ปานกลาง (แนะนำ)</option>
+                    <option value="60">ต่ำ (ต้องพูดดังหน่อย)</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h3>2. เลือกโหมดการทำงาน</h3>
+            <div class="tabs">
+                <button class="tab-btn active" id="modeRealtimeBtn" onclick="switchMode('realtime')">Real-time Capture</button>
+                <button class="tab-btn" id="modeUploadBtn" onclick="switchMode('upload')">Upload Voice Capture</button>
+            </div>
+
+            <div id="realtimeControls">
+                <p style="color: #94a3b8; font-size: 14px;">ระบบจะจับเสียงจากไมโครโฟนสดๆ และเปลี่ยนภาพตามจังหวะพูด เมื่อกด Stop จะทำการเซฟวิดีโอ 1080p ทันที</p>
+                <div class="controls">
+                    <button class="btn btn-start" id="startBtn">Start Recording</button>
+                    <button class="btn btn-stop" id="stopBtn" disabled>Stop & Save Video</button>
+                </div>
+            </div>
+
+            <div id="uploadControls" style="display: none;">
+                <p style="color: #94a3b8; font-size: 14px;">อัพโหลดไฟล์เสียง (.mp3, .wav) ระบบจะประมวลผล เล่นภาพอนิเมชั่น และแปลงไฟล์เป็นวิดีโอ 1080p ให้ทันทีอัตโนมัติ</p>
+                <div class="form-group">
+                    <label for="audioInput">เลือกไฟล์เสียง:</label>
+                    <input type="file" id="audioInput" accept="audio/*">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="stage-container">
+        <h3 id="stageTitle">หน้าจอแสดงผล (1920x1080 Canvas)</h3>
+        <canvas id="stageCanvas" width="1920" height="1080" style="width: 480px; height: 270px;"></canvas>
+        <div class="status" id="statusText">ระบบพร้อมใช้งาน (กรุณาอัพโหลดรูปภาพ)</div>
+    </div>
+
+    <div id="videoPreviewContainer" style="display: none;">
+        <h3>วิดีโอที่บันทึกสำเร็จ (1080p)</h3>
+        <video id="videoPlayback" controls></video>
+        <br><br>
+        <a id="downloadLink" class="btn btn-start" style="text-decoration: none; display: inline-block;" download="avatar-talking.mp4">ดาวน์โหลดวิดีโอ</a>
+    </div>
+</div>
+
+<script>
+    // Elements
+    const canvas = document.getElementById('stageCanvas');
+    const ctx = canvas.getContext('2d');
+    const img1Input = document.getElementById('img1Input');
+    const img2Input = document.getElementById('img2Input');
+    const audioInput = document.getElementById('audioInput');
+    const startBtn = document.getElementById('startBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const statusText = document.getElementById('statusText');
+    const thresholdSelect = document.getElementById('thresholdSelect');
+    const videoPreviewContainer = document.getElementById('videoPreviewContainer');
+    const videoPlayback = document.getElementById('videoPlayback');
+    const downloadLink = document.getElementById('downloadLink');
+
+    // State Variables
+    let currentMode = 'realtime'; // 'realtime' หรือ 'upload'
+    let img1 = new Image();
+    let img2 = new Image();
+    let isImg1Loaded = false;
+    let isImg2Loaded = false;
+    
+    let audioContext, analyser, javascriptNode, mediaStream, sourceNode;
+    let mediaRecorder;
+    let recordedChunks = [];
+    
+    // Animation/State Properties
+    let isSpeaking = false;
+    let scaleY = 1.0;
+    let offsetY = 0;
+    let targetScaleY = 1.0;
+    let targetOffsetY = 0;
+
+    // ตั้งค่ารูปภาพเริ่มต้น (Fallback เป็นสีเหลี่ยมกรณีผู้ใช้ยังไม่อัพโหลด)
+    function drawDefaultAvatar(text, color) {
+        ctx.fillStyle = "#1e293b";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = color;
+        ctx.fillRect(canvas.width/2 - 200, canvas.height/2 - 200, 400, 400);
+        ctx.fillStyle = "#fff";
+        ctx.font = "40px Arial";
+        ctx.textAlign = "center";
+        ctx.fillText(text, canvas.width/2, canvas.height/2);
+    }
+    
+    // วาดหน้าจอเริ่มต้น
+    drawDefaultAvatar("กรุณาอัพโหลดภาพ 1 และ 2", "#475569");
+
+    // Handle Image Uploads
+    img1Input.onchange = (e) => {
+        const file = e.target.files[0];
+        if(file) {
+            img1.src = URL.createObjectURL(file);
+            img1.onload = () => { isImg1Loaded = true; renderStage(); };
+        }
+    };
+
+    img2Input.onchange = (e) => {
+        const file = e.target.files[0];
+        if(file) {
+            img2.src = URL.createObjectURL(file);
+            img2.onload = () => { isImg2Loaded = true; renderStage(); };
+        }
+    };
+
+    // เปลี่ยนโหมด Realtime / Upload
+    function switchMode(mode) {
+        currentMode = mode;
+        document.getElementById('modeRealtimeBtn').classList.toggle('active', mode === 'realtime');
+        document.getElementById('modeUploadBtn').classList.toggle('active', mode === 'upload');
+        document.getElementById('realtimeControls').style.display = mode === 'realtime' ? 'block' : 'none';
+        document.getElementById('uploadControls').style.display = mode === 'upload' ? 'block' : 'none';
+        resetSystem();
+    }
+
+    function resetSystem() {
+        if(mediaStream) mediaStream.getTracks().forEach(track => track.stop());
+        if(audioContext) audioContext.close();
+        statusText.innerText = "เปลี่ยนโหมดแล้ว พร้อมทำงาน";
+        startBtn.disabled = false;
+        stopBtn.disabled = true;
+    }
+
+    // ฟังก์ชั่นหลักในการคำนวณการวาดภาพและอนิเมชั่นเด้ง
+    function renderStage() {
+        // ใช้ชิฟสีเขียว (Green Screen) เป็นพื้นหลัง เพื่อให้ผู้ใช้นำไปตัดต่อในโปรแกรมอื่นได้ง่าย
+        ctx.fillStyle = "#00ff00"; 
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // ดึงค่า Smooth Animation (Lerp)
+        scaleY += (targetScaleY - scaleY) * 0.3;
+        offsetY += (targetOffsetY - offsetY) * 0.3;
+
+        let activeImg = isSpeaking ? (isImg2Loaded ? img2 : null) : (isImg1Loaded ? img1 : null);
+
+        if (activeImg) {
+            // คำนวณหาขนาดให้อยู่ตรงกลางจอและพอดีสัดส่วน
+            let ratio = Math.min(canvas.width / activeImg.width, canvas.height / activeImg.height) * 0.8;
+            let w = activeImg.width * ratio;
+            let h = activeImg.height * ratio;
+            let x = (canvas.width - w) / 2;
+            let y = (canvas.height - h) / 2 + 100; // เยื้องลงมาข้างล่างนิดนึงพอน่ารัก
+
+            ctx.save();
+            // จุดหมุนอยู่ด้านล่างสุดของภาพเพื่อให้เด้งขึ้นจากพื้น
+            ctx.translate(x + w/2, y + h); 
+            ctx.scale(1 + (1 - scaleY)*0.1, scaleY); // บีบซ้ายขวานิดหน่อยตอนยุบตัวเพื่อความยืดหยุ่น (Squash and Stretch)
+            ctx.translate(-(x + w/2), -(y + h));
+            
+            // วาดภาพโดยขยับแกน Y ตามทิศทางเด้งขึ้นลง
+            ctx.drawImage(activeImg, x, y - offsetY, w, h);
+            ctx.restore();
+        } else {
+            // ถ้ายังไม่ได้อัพโหลดรูปให้แสดงตัวอย่างสี่เหลี่ยมแทน
+            drawDefaultAvatar(isSpeaking ? "กำลังพูด (ภาพ 2)" : "เงียบ (ภาพ 1)", isSpeaking ? "#10b981" : "#ef4444");
+        }
+    }
+
+    // Loop อนิเมชั่นสำหรับการวาดภาพลง Canvas อย่างต่อเนื่อง
+    function animationLoop() {
+        if (isSpeaking) {
+            targetScaleY = 1.15; // เด้งยืดขึ้น 15%
+            targetOffsetY = 40;  // ลอยขึ้นจากพื้น 40px
+        } else {
+            targetScaleY = 1.0;  // กลับมาขนาดปกติ
+            targetOffsetY = 0;   // กลับมาอยู่ที่พื้น
+        }
+        renderStage();
+        requestAnimationFrame(animationLoop);
+    }
+    // เริ่มต้นระบบ Loop เปล่าๆ ไว้ล่วงหน้าเลย
+    requestAnimationFrame(animationLoop);
+
+
+    // ==========================================
+    //  ฟังก์ชั่นจัดการเกี่ยวกับระบบบันทึกวิดีโอ (1080p)
+    // ==========================================
+    function setupVideoRecorder(streamWithAudio) {
+        recordedChunks = [];
+        // ดึง Video Stream จาก Canvas ที่รันแบบ 60fps
+        const canvasStream = canvas.captureStream(60); 
+        
+        // รวมแทร็กเสียงเข้ากับแทร็กวิดีโอของ Canvas
+        const combinedStream = new MediaStream();
+        canvasStream.getVideoTracks().forEach(track => combinedStream.addTrack(track));
+        if(streamWithAudio) {
+            streamWithAudio.getAudioTracks().forEach(track => combinedStream.addTrack(track));
+        }
+
+        // ใช้ H264 หรือ VP9 ในการเข้ารหัสที่เสถียรและชัดระดับ HD
+        let options = { mimeType: 'video/webm;codecs=vp9,opus', videoBitsPerSecond: 5000000 }; // 5 Mbps สำหรับความคมชัดสูงสุด
+        if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+            options = { mimeType: 'video/webm;codecs=h264,opus', videoBitsPerSecond: 5000000 };
+        }
+
+        mediaRecorder = new MediaRecorder(combinedStream, options);
+        
+        mediaRecorder.ondataavailable = (e) => {
+            if (e.data.size > 0) recordedChunks.push(e.data);
+        };
+
+        mediaRecorder.onstop = () => {
+            const blob = new Blob(recordedChunks, { type: 'video/webm' });
+            const videoURL = URL.createObjectURL(blob);
+            videoPlayback.src = videoURL;
+            downloadLink.href = videoURL;
+            videoPreviewContainer.style.display = 'block';
+            statusText.innerText = "แปลงวิดีโอ 1080p สำเร็จเรียบร้อย!";
+        };
+
+        mediaRecorder.start();
+    }
+
+
+    // ==========================================
+    //  MODE 1: REAL-TIME CAPTURE (ไมโครโฟนสด)
+    // ==========================================
+    startBtn.onclick = async () => {
+        try {
+            mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+            
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            analyser = audioContext.createAnalyser();
+            sourceNode = audioContext.createMediaStreamSource(mediaStream);
+            
+            analyser.fftSize = 256;
+            sourceNode.connect(analyser);
+            
+            javascriptNode = audioContext.createScriptProcessor(256, 1, 1);
+            analyser.connect(javascriptNode);
+            javascriptNode.connect(audioContext.destination);
+
+            const bufferLength = analyser.frequencyBinCount;
+            const dataArray = new Uint8Array(bufferLength);
+
+            javascriptNode.onaudioprocess = () => {
+                analyser.getByteFrequencyData(dataArray);
+                let total = 0;
+                for (let i = 0; i < bufferLength; i++) {
+                    total += dataArray[i];
+                }
+                let average = total / bufferLength;
+                
+                // เช็คค่าความดังเสียงเทียบกับ Threshold ที่ตั้งไว้
+                let threshold = parseInt(thresholdSelect.value);
+                isSpeaking = average > threshold;
+            };
+
+            // เริ่มทำการอัดวิดีโอหน้าจอร่วมกับเสียงไมค์
+            setupVideoRecorder(mediaStream);
+
+            startBtn.disabled = true;
+            stopBtn.disabled = false;
+            statusText.innerText = "🔴 กำลังบันทึกเสียงและวิดีโอแบบ Real-time...";
+            videoPreviewContainer.style.display = 'none';
+
+        } catch (err) {
+            alert("ไม่สามารถเข้าถึงไมโครโฟนได้: " + err);
+        }
+    };
+
+    stopBtn.onclick = () => {
+        statusText.innerText = "กำลังประมวลผลไฟล์วิดีโอ...";
+        // หยุดการบันทึกเสียง
+        if (mediaRecorder) mediaRecorder.stop();
+        if (mediaStream) mediaStream.getTracks().forEach(track => track.stop());
+        if (audioContext) audioContext.close();
+        isSpeaking = false;
+        
+        startBtn.disabled = false;
+        stopBtn.disabled = true;
+    };
+
+
+    // ==========================================
+    //  MODE 2: UPLOAD VOICE CAPTURE (อัพโหลดไฟล์เสียง)
+    // ==========================================
+    audioInput.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        statusText.innerText = "กำลังโหลดไฟล์เสียงและเตรียมแปลงไฟล์วิดีโอ...";
+        videoPreviewContainer.style.display = 'none';
+
+        // สร้าง Element Audio ลับๆ ขึ้นมาเพื่อเล่นไฟล์เสียงซิงค์กับระบบเว็บบอร์ด
+        const audioUrl = URL.createObjectURL(file);
+        const audioEl = new Audio(audioUrl);
+        
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        analyser = audioContext.createAnalyser();
+        sourceNode = audioContext.createMediaElementSource(audioEl);
+        
+        analyser.fftSize = 256;
+        sourceNode.connect(analyser);
+        analyser.connect(audioContext.destination);
+
+        javascriptNode = audioContext.createScriptProcessor(256, 1, 1);
+        analyser.connect(javascriptNode);
+        javascriptNode.connect(audioContext.destination);
+
+        const bufferLength = analyser.frequencyBinCount;
+        const dataArray = new Uint8Array(bufferLength);
+
+        javascriptNode.onaudioprocess = () => {
+            analyser.getByteFrequencyData(dataArray);
+            let total = 0;
+            for (let i = 0; i < bufferLength; i++) {
+                total += dataArray[i];
+            }
+            let average = total / bufferLength;
+            let threshold = parseInt(thresholdSelect.value);
+            isSpeaking = average > threshold;
+        };
+
+        // ดึง Audio Stream เพื่อนำไปผสานลงใน Video Recorder
+        // บราวเซอร์เวอร์ชั่นใหม่ๆ รองรับการ capture Audio จาก Element โดยตรง
+        let audioStream;
+        if (audioEl.captureStream) {
+            audioStream = audioEl.captureStream();
+        } else if (audioEl.mozCaptureStream) {
+            audioStream = audioEl.mozCaptureStream();
+        } else {
+            // Fallback สตรีมจากปลายทาง audio context
+            const dest = audioContext.createMediaStreamDestination();
+            sourceNode.connect(dest);
+            audioStream = dest.stream;
+        }
+
+        // เริ่มเล่นเสียงและสั่ง Record ทันทีอัตโนมัติ
+        audioEl.play();
+        setupVideoRecorder(audioStream);
+        statusText.innerText = "⏳ ระบบกำลังเล่นไฟล์เสียงเพื่อเรนเดอร์วิดีโออัตโนมัติ...";
+
+        // เมื่อไฟล์เสียงเล่นจบ (จบกระบวนการ) ให้ทำการสลัดไฟล์วิดีโอออกทันที
+        audioEl.onended = () => {
+            mediaRecorder.stop();
+            audioContext.close();
+            isSpeaking = false;
+            statusText.innerText = "แปลงวิดีโอ 1080p สำเร็จเรียบร้อย!";
+        };
+    };
+</script>
+
+</body>
+</html>
